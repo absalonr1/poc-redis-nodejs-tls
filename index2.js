@@ -1,65 +1,38 @@
-import { createRequire } from 'module'
-const require = createRequire(import.meta.url)
+import express from 'express'
+//import redis conection
+import redisInit from './helpers/redis.js'
+//import some function
+import { getRedisValue } from './services/testService.js'
+// Constants - you can use environment
+const NODE_PORT = 3007;
+const NODE_HOST = '0.0.0.0';
+const NODE_ENV = 'development';
 
-const redis = require('redis');
-const express = require('express');
-
-
-const redisConnection = async () => {
-
-  const client = redis.createClient({
-    //url: 'redis://redis-dev-cluster.kglkzz.ng.0001.usw2.cache.amazonaws.com:6379'
-    socket:{
-        port:6379,
-        //host:"redis-dev-cluster.kglkzz.ng.0001.usw2.cache.amazonaws.com",
-        host:"master.prod-redis-acl-tls-cluster.0wazm6.use1.cache.amazonaws.com",
-
-        tls: true
-    },
-    username:"test-user",
-    password:"testuser12345678"
-  });
-  
-   client.on('error', (err) => console.log('Redis Client Error', err));
-  
-  await client.connect();
-  return client;
-  
-  // https://github.com/redis/node-redis#disconnect
-  //await client.disconnect();
-
-};
-var conn = await redisConnection();
-
-
-// Constants
-const PORT = 8080;
-const HOST = '0.0.0.0';
 const app = express();
+//init redis conection
+redisInit.getConnection()
 
-const getRedisValue = async (key) => {
-    var ret = await conn.get(key);
-   return ret;
+//define your api method (you can set in routes dir)
+app.get('/api/v1/test/:val', async (req, res) => {
+  try {
+    const result = await getRedisValue(req.params.val)
+    console.log("result ", result)
+    if (result) {
+      res.json({ status: true, message: "ok", data: { value: result } })
+    }
+    else {
+      res.status(404).json({ status: false, message: "Not Found", data: {} })
+    }
+  } catch (error) {
+    console.log("error ", error)
+    res.status(500).send("Ha ocurrido un error interno")
   }
-
-app.get('/test/:val', (req, res) => {
-    
-      getRedisValue(req.params.val).then(
-          value => {
-            
-            if(value == undefined){
-                value = "Not From Redis";
-                conn.set(req.params.val, req.params.val);
-                res.json({ msg:value})
-            }
-            else{
-                value = "From Redis - "+ value;
-                res.json({ msg:value})
-            }
-            console.log("Returning");
-          }
-      );
-      console.log("After then()");
 });
 
-app.listen(PORT, HOST);
+app.get('/api/v1/liveness', async (req, res) => {
+  res.json({ status: true, message: "ok", data: { value: result } })
+});
+
+app.listen(NODE_PORT, NODE_HOST, async () => {
+  console.log(`success ${NODE_HOST}:${NODE_PORT} - ${NODE_ENV}`)
+});
